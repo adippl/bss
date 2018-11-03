@@ -7,6 +7,11 @@ if [[ -z $btrfsbin  ]] ;then
 	echo "!! Exiting...."
 	exit
 fi
+pvbin=$(whereis pv |awk '{print $2}')
+if [[ -z $pvbin  ]] ;then
+	echo "!~ Couldn't find pv binary on the system"
+	exit
+fi
 
 delsubvol () {
 	echo == deleting snapshot $snapdir/$subnd
