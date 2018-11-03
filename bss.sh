@@ -19,7 +19,6 @@ delsubvol () {
 }
 doesexist_ossh (){
 	detemp=$(ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn} ")
-#	case $(detemp|grep readonly)
 	if [[ -e $detemp  ]] ; then
 		echo == snapshot exists
 		if [[ -e $(detemp|grep readonly) ]] ; then
