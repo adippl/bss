@@ -1,17 +1,21 @@
 #!/bin/bash
 #btrfs-bin=btrfs
 
-btrfsbin=$(whereis btrfs |awk '{print $2}')
-if [[ -z $btrfsbin  ]] ;then
-	echo "!! Couldn't find btrfs-progs binary on the system"
-	echo "!! Exiting...."
-	exit
-fi
-pvbin=$(whereis pv |awk '{print $2}')
-if [[ -z $pvbin  ]] ;then
-	echo "!~ Couldn't find pv binary on the system"
-	exit
-fi
+bin_check(){
+	btrfsbin=$(whereis btrfs |awk '{print $2}')
+	if [[ -z $btrfsbin  ]] ;then
+		echo "!! Couldn't find btrfs-progs binary on the system"
+		echo "!! Exiting...."
+		exit
+	fi
+	pvbin=$(whereis pv |awk '{print $2}')
+	if [[ -z $pvbin  ]] ;then
+		echo "!~ Couldn't find pv binary on the system"
+		exit
+	fi
+}
+
+
 
 delsubvol () {
 	echo == deleting snapshot $snapdir/$subnd
@@ -30,7 +34,6 @@ doesexist_ossh (){
 		fi
 	echo !! snapshot trasnfer failed
 	#subvoldel()
-
 	fi
 }
 
@@ -40,7 +43,7 @@ transp () {
 			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
 		;;
 		nc)
-			ssh -i $sshid -f root@10.0.6.11 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+			ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
 			sleep 1
 			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
 
@@ -63,6 +66,7 @@ transp () {
 #echo ${a[0]}
 #echo ${a[1]}
 
+bin_check
 mount /mnt/a/
 IFS='
 '
@@ -121,7 +125,8 @@ fi
 
 for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $subkeep',$p'); do 
 
-	echo --	btrfs sub del $snapdir/$x
+	#echo --	btrfs sub del $snapdir/$x
+	btrfs sub del $snapdir/$x
 done
 
 IFS='
