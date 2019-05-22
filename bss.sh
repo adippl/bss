@@ -1,16 +1,38 @@
 #!/bin/bash
 #btrfs-bin=btrfs
 
+IFS_bk=$IFS
+
+
+echo_msg(){
+	if [ DEBUG == "-1" ] ;then 
+		echo $@
+	fi
+	case $1 in
+		"==")
+			echo $@
+		;;
+		"~~")
+			if [ DEBUG == "1" ] ;then
+				echo $@
+			fi
+		;;
+		"!!")
+			echo $@
+		;;
+	esac
+}
+
 bin_check(){
 	btrfsbin=$(whereis btrfs |awk '{print $2}')
 	if [[ -z $btrfsbin  ]] ;then
-		echo "!! Couldn't find btrfs-progs binary on the system"
-		echo "!! Exiting...."
+		echo_msg !! "Couldn't find btrfs-progs binary on the system"
+		echo_msg !! "Exiting...."
 		exit
 	fi
 	pvbin=$(whereis pv |awk '{print $2}')
 	if [[ -z $pvbin  ]] ;then
-		echo "!~ Couldn't find pv binary on the system"
+		echo_msg !! "Couldn't find pv binary on the system"
 		exit
 	fi
 }
@@ -18,21 +40,21 @@ bin_check(){
 
 
 delsubvol () {
-	echo == deleting snapshot $snapdir/$subnd
-	echo $btrfs sub $subnd
+	echo_msg == deleting snapshot $snapdir/$subnd
+	echo_msg $btrfs sub $subnd
 }
 doesexist_ossh (){
 	detemp=$(ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn} ")
 	if [[ -e $detemp  ]] ; then
-		echo == snapshot exists
+		echo_msg == snapshot exists
 		if [[ -e $(detemp|grep readonly) ]] ; then
-			echo == snapshot read only, probably fine
+			echo_msg == snapshot read only, probably fine
 			return 0
 		else
-			echo !! snapshot incomplete
+			echo_msg !! snapshot incomplete
 	#		delsubvol()
 		fi
-	echo !! snapshot trasnfer failed
+	echo_msg !! "snapshot trasnfer failed"
 	#subvoldel()
 	fi
 }
@@ -54,7 +76,7 @@ transp () {
 		
 		;;
 		*)
-		echo '!! network option unhandled'
+		echo_msg !! "network option unhandled"
 		;;
 	esac
 	
@@ -85,51 +107,47 @@ for x in $(cat /etc/bss.conf) ; do
 	ip=$(echo $sshuh | cut -d '@' -f 2)
 	subnd="$subn-r-$(date +'%y%m%d')"
 
-if [[ $2 == 'debug' ]] ; then 
-	echo ------------------------------------
-	echo subn		$subn
-	echo snapfs		$snapfs
-	echo snapdir		$snapdir
-	echo snapsendloc	$snapsendloc
-	echo sshuh		$sshuh
-	echo sshid		$sshid
-	echo subkeep		$subkeep
-	echo trans		$trans
-	echo 'ip(from sshuh)'	$ip
-	echo subnd		$subnd
-	echo ------------------------------------
-	echo
-	echo
-	echo
-	echo
-fi
-
-
-#if [[ ! -d $snapdir/$subd ]]; then #doesn't work and I don't know why :/
-if [[ -z $( ls -1 $snapdir | grep $subnd ) ]]; then
-
-	echo == creating snapshot $snapdir/$subnd
-	btrfs sub snap -r $snapfs $snapdir/$subnd
-	snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
-	snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
-	echo	snapp	$snapp
-	echo	snapf	$snapf
-
-	transp
-
-else
-	echo ==  snapshot already exists!
+	if [ "DEBUG" == '1' ] ; then 
+		echo_msg ~~ "------------------------------------"
+		echo_msg ~~ "subn		"$subn
+		echo_msg ~~ "snapfs		"$snapfs
+		echo_msg ~~ "snapdir		"$snapdir
+		echo_msg ~~ "snapsendloc	"$snapsendloc
+		echo_msg ~~ "sshuh		"$sshuh
+		echo_msg ~~ "sshid		"$sshid
+		echo_msg ~~ "subkeep		"$subkeep
+		echo_msg ~~ "trans		"$trans
+		echo_msg ~~ "'ip(from sshuh)'	"$ip
+		echo_msg ~~ "subnd		"$subnd
+		echo_msg ~~ "------------------------------------"
+	fi
 	
-fi
-
-
-for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $subkeep',$p'); do 
-
-	#echo --	btrfs sub del $snapdir/$x
-	btrfs sub del $snapdir/$x
+	
+	#if [[ ! -d $snapdir/$subd ]]; then #doesn't work and I don't know why :/
+	if [[ -z $( ls -1 $snapdir | grep $subnd ) ]]; then
+	
+		echo == "creating snapshot "$snapdir'/'$subnd
+		btrfs sub snap -r $snapfs $snapdir/$subnd
+		snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
+		snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
+		echo_msg 	~~ "snapp	"$snapp
+		echo_msg 	~~ "snapf	"$snapf
+		#transp($transp)
+		transp
+	else
+		echo ==  snapshot already exists!
+		
+	fi
+	
+	
+	for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $subkeep',$p'); do 
+	
+		echo_msg ~~ "btrfs sub del "$snapdir'/'$x
+		btrfs sub del $snapdir/$x
+	done
+	
+	IFS='
+	'
 done
 
-IFS='
-'
-done
-
+IFS=$IFS_bk
