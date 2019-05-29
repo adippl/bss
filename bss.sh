@@ -23,6 +23,7 @@ echo_msg(){
 	esac
 }
 
+
 bin_check(){
 	btrfsbin=$(whereis btrfs |awk '{print $2}')
 	if [[ -z $btrfsbin  ]] ;then
@@ -36,7 +37,6 @@ bin_check(){
 		exit
 	fi
 }
-
 
 
 delsubvol () {
@@ -82,6 +82,93 @@ transp () {
 	
 }
 
+if [ $2 == "inc" ] ; then 
+elif [ $2 == "comp" ] ; then 
+else
+	echo_msg !! "error"
+fi
+
+send_with () {
+	case $1 in
+		ssh)
+			if [ $2 == "inc" ] ; then 
+				btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
+				ec=${PIPESTATUS[3]}
+			elif [ $2 == "comp" ] ; then 
+				btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
+				ec=${PIPESTATUS[3]}
+			else
+				echo_msg !! "error"
+			fi
+
+			#btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc	#old inc only send
+			case in $ec
+				0)
+				return 0
+				;;
+				1)
+				return 1
+				;;
+			esac
+
+		;;
+		nc)
+			#ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+			#sleep 1
+			#btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
+
+			if [ $2 == "inc" ] ; then 
+				ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+				sleep 1
+				btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
+				ec=${PIPESTATUS[1]}
+			elif [ $2 == "comp" ] ; then 
+				ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+				sleep 1
+				btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0
+				ec=${PIPESTATUS[1]}
+			else
+				echo_msg !! "error"
+			fi
+
+			case in $ec
+				0)
+				return 0
+				;;
+				1)
+				return 1
+				;;
+			esac
+		;;
+		local)
+			#btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
+			
+			if [ $2 == "inc" ] ; then 
+				btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
+				ec=${PIPESTATUS[3]}
+			elif [ $2 == "comp" ] ; then 
+				echo_msg !! "sending complete subvolume"
+				btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
+				ec=${PIPESTATUS[3]}
+			else
+				echo_msg !! "error"
+			fi
+
+			case in $ec
+				0)
+				return 0
+				;;
+				1)
+				return 1
+				;;
+			esac
+		;;
+		*)
+		echo_msg !! "network option unhandled"
+		return 2
+		;;
+	esac
+}
 
 #s='foo bar baz'
 #a=( $s )
@@ -92,9 +179,8 @@ bin_check
 mount /mnt/a/
 IFS='
 '
-#if [[ -e $1 ]]
 
-for x in $(cat /etc/bss.conf) ; do
+for x in $(grep -v "#" /etc/bss.conf) ; do
 	IFS=' 	' read -r -a linearray <<< $x
 	subn=${linearray[0]} 
 	snapfs=${linearray[1]}
@@ -132,8 +218,31 @@ for x in $(cat /etc/bss.conf) ; do
 		snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
 		echo_msg 	~~ "snapp	"$snapp
 		echo_msg 	~~ "snapf	"$snapf
-		#transp($transp)
-		transp
+
+		send_with($transp) 
+
+		if (( $? == 1 )) then;
+			echo_msg !! "error while sending subvolume"
+			for x in $(seq 3 $subkeep) ; do
+				snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n $x'p')
+				if [ $snapp == "" ] ;then
+					echo !! "subvolume missing"
+					ec=1
+					break
+				fi
+				echo_msg !! "attempting to send using older parent"
+				echo_msg 	~~ "snapp	"$snapp
+				echo_msg 	~~ "snapf	"$snapf
+				send_with($transp) 
+				ec=$?
+				if (( $ec == 0)) ;then break ;fi
+			done
+			if (( $ec == 1)) ;then
+				echo_msg !! "all avalible parent subvolumes failed. Attempting to send complete snapshot"
+			fi
+
+
+		fi
 	else
 		echo ==  snapshot already exists!
 		
