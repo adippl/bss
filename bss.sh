@@ -22,6 +22,14 @@ echo_msg(){
 		;;
 	esac
 }
+#exec_wrap(){	#doesn't work
+#	if [ DEBUG = "1" ] ;then
+#		echo "~~ DEBUG MODE is on, if it wasn't this command ↓↓↓↓↓ would have been executed"
+#		echo "$@"
+#	else
+#		$@
+#	fi
+#}
 
 
 bin_check(){
@@ -43,21 +51,21 @@ delsubvol () {
 	echo_msg == deleting snapshot $snapdir/$subnd
 	echo_msg $btrfs sub $subnd
 }
-doesexist_ossh (){
-	detemp=$(ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn} ")
-	if [[ -e $detemp  ]] ; then
-		echo_msg == snapshot exists
-		if [[ -e $(detemp|grep readonly) ]] ; then
-			echo_msg == snapshot read only, probably fine
-			return 0
-		else
-			echo_msg !! snapshot incomplete
-	#		delsubvol()
-		fi
-	echo_msg !! "snapshot trasnfer failed"
-	#subvoldel()
-	fi
-}
+#doesexist_ossh (){	#unused
+#	detemp=$(ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn} ")
+#	if [[ -e $detemp  ]] ; then
+#		echo_msg == snapshot exists
+#		if [[ -e $(detemp|grep readonly) ]] ; then
+#			echo_msg == snapshot read only, probably fine
+#			return 0
+#		else
+#			echo_msg !! snapshot incomplete
+#	#		delsubvol()
+#		fi
+#	echo_msg !! "snapshot trasnfer failed"
+#	#subvoldel()
+#	fi
+#}
 
 transp () {
 	case $transp in
@@ -82,19 +90,15 @@ transp () {
 	
 }
 
-if [ $2 == "inc" ] ; then 
-elif [ $2 == "comp" ] ; then 
-else
-	echo_msg !! "error"
-fi
-
 send_with () {
 	case $1 in
 		ssh)
 			if [ $2 == "inc" ] ; then 
+				echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
 				btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
 				ec=${PIPESTATUS[3]}
 			elif [ $2 == "comp" ] ; then 
+				echo_msg ~~ "btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
 				btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
 				ec=${PIPESTATUS[3]}
 			else
@@ -118,13 +122,17 @@ send_with () {
 			#btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
 
 			if [ $2 == "inc" ] ; then 
+				echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
 				ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
 				sleep 1
+				echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0"
 				btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
 				ec=${PIPESTATUS[1]}
 			elif [ $2 == "comp" ] ; then 
+				echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
 				ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
 				sleep 1
+				echo_msg ~~ "btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0"
 				btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0
 				ec=${PIPESTATUS[1]}
 			else
@@ -144,10 +152,12 @@ send_with () {
 			#btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
 			
 			if [ $2 == "inc" ] ; then 
+				echo_msg ~~ "btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc"
 				btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
 				ec=${PIPESTATUS[3]}
 			elif [ $2 == "comp" ] ; then 
 				echo_msg !! "sending complete subvolume"
+				echo_msg ~~ "btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc"
 				btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
 				ec=${PIPESTATUS[3]}
 			else
@@ -169,11 +179,6 @@ send_with () {
 		;;
 	esac
 }
-
-#s='foo bar baz'
-#a=( $s )
-#echo ${a[0]}
-#echo ${a[1]}
 
 bin_check
 mount /mnt/a/
@@ -219,7 +224,7 @@ for x in $(grep -v "#" /etc/bss.conf) ; do
 		echo_msg 	~~ "snapp	"$snapp
 		echo_msg 	~~ "snapf	"$snapf
 
-		send_with($transp) 
+		send_with($transp inc) 
 
 		if (( $? == 1 )) then;
 			echo_msg !! "error while sending subvolume"
@@ -233,19 +238,19 @@ for x in $(grep -v "#" /etc/bss.conf) ; do
 				echo_msg !! "attempting to send using older parent"
 				echo_msg 	~~ "snapp	"$snapp
 				echo_msg 	~~ "snapf	"$snapf
-				send_with($transp) 
+				send_with($transp inc) 
 				ec=$?
 				if (( $ec == 0)) ;then break ;fi
 			done
 			if (( $ec == 1)) ;then
 				echo_msg !! "all avalible parent subvolumes failed. Attempting to send complete snapshot"
+				send_with($transp comp) 
 			fi
 
 
 		fi
 	else
-		echo ==  snapshot already exists!
-		
+		echo_msg !! "snapshot already exists!"
 	fi
 	
 	
