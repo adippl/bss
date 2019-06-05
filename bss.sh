@@ -51,6 +51,7 @@ delsubvol () {
 	echo_msg == deleting snapshot $snapdir/$subnd
 	echo_msg $btrfs sub $subnd
 }
+
 #doesexist_ossh (){	#unused
 #	detemp=$(ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn} ")
 #	if [[ -e $detemp  ]] ; then
@@ -67,111 +68,110 @@ delsubvol () {
 #	fi
 #}
 
-transp () {
-	case $transp in
-		ssh)
-			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
-		;;
-		nc)
-			ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
-			sleep 1
-			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
-
-		;;
-		local)
-			btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| ssh -i $sshid sshuh btrfs
-		
-		
-		;;
-		*)
-		echo_msg !! "network option unhandled"
-		;;
-	esac
-	
-}
+#transp () { #unused
+#	case $transp in
+#		ssh)
+#			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
+#		;;
+#		nc)
+#			ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+#			sleep 1
+#			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
+#
+#		;;
+#		local)
+#			btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| ssh -i $sshid sshuh btrfs
+#		
+#		
+#		;;
+#		*)
+#		echo_msg !! "network option unhandled"
+#		;;
+#	esac
+#	
+#}
 
 send_with () {
 	case $1 in
 		ssh)
-			if [ $2 == "inc" ] ; then 
-				echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
-				btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
-				ec=${PIPESTATUS[3]}
-			elif [ $2 == "comp" ] ; then 
-				echo_msg ~~ "btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
-				btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
-				ec=${PIPESTATUS[3]}
-			else
-				echo_msg !! "error"
-			fi
-
-			#btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc	#old inc only send
-			case in $ec
-				0)
-				return 0
-				;;
-				1)
-				return 1
-				;;
+			case $2 in
+				inc)
+					echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
+					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
+					ec=${PIPESTATUS[3]}
+					break
+					;;
+				comp)
+					echo_msg ~~ "btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
+					btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
+					ec=${PIPESTATUS[3]}
+					break
+					;;
+				*)
+					echo_msg !! "error"
+					break
+					;;
 			esac
+			#case $ec in
+			#	0)
+			#	return 0
+			#	;;
+			#	1)
+			#	return 1
+			#	;;
+			#esac
+			return $ec
 
 		;;
 		nc)
-			#ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
-			#sleep 1
-			#btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
-
-			if [ $2 == "inc" ] ; then 
-				echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
-				ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
-				sleep 1
-				echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0"
-				btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
-				ec=${PIPESTATUS[1]}
-			elif [ $2 == "comp" ] ; then 
-				echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
-				ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
-				sleep 1
-				echo_msg ~~ "btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0"
-				btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0
-				ec=${PIPESTATUS[1]}
-			else
-				echo_msg !! "error"
-			fi
-
-			case in $ec
-				0)
-				return 0
-				;;
-				1)
-				return 1
-				;;
+			case $2 in
+				inc)
+					echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
+					ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+					sleep 1
+					echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0"
+					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
+					ec=${PIPESTATUS[1]}
+					break
+					;;
+				comp)
+					echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
+					ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+					sleep 1
+					echo_msg ~~ "btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0"
+					btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0
+					ec=${PIPESTATUS[1]}
+					break
+					;;
+				*)
+					echo_msg !! "error"
+					;;
 			esac
+
+			return $ec
 		;;
 		local)
 			#btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
-			
-			if [ $2 == "inc" ] ; then 
-				echo_msg ~~ "btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc"
-				btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
-				ec=${PIPESTATUS[3]}
-			elif [ $2 == "comp" ] ; then 
-				echo_msg !! "sending complete subvolume"
-				echo_msg ~~ "btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc"
-				btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
-				ec=${PIPESTATUS[3]}
-			else
-				echo_msg !! "error"
-			fi
-
-			case in $ec
-				0)
-				return 0
-				;;
-				1)
-				return 1
-				;;
+			case $2 in
+				inc)
+					echo_msg ~~ "btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc"
+					btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
+					ec=${PIPESTATUS[3]}
+					break
+					;;
+				comp)
+					echo_msg !! "sending complete subvolume"
+					echo_msg ~~ "btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc"
+					btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
+					ec=${PIPESTATUS[3]}
+					break
+					;;
+				*)
+					echo_msg !! "error"
+					;;
 			esac
+
+			return $ec
 		;;
 		*)
 		echo_msg !! "network option unhandled"
@@ -181,7 +181,7 @@ send_with () {
 }
 
 bin_check
-mount /mnt/a/
+mount /mnt/a/		## this will be fixed, filesystem needs to be mouned on my particural machine
 IFS='
 '
 
@@ -224,9 +224,9 @@ for x in $(grep -v "#" /etc/bss.conf) ; do
 		echo_msg 	~~ "snapp	"$snapp
 		echo_msg 	~~ "snapf	"$snapf
 
-		send_with($transp inc) 
+		send_with $transp inc
 
-		if (( $? == 1 )) then;
+		if (( $? == 1 )) ; then
 			echo_msg !! "error while sending subvolume"
 			for x in $(seq 3 $subkeep) ; do
 				snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n $x'p')
@@ -238,13 +238,13 @@ for x in $(grep -v "#" /etc/bss.conf) ; do
 				echo_msg !! "attempting to send using older parent"
 				echo_msg 	~~ "snapp	"$snapp
 				echo_msg 	~~ "snapf	"$snapf
-				send_with($transp inc) 
+				send_with $transp inc
 				ec=$?
 				if (( $ec == 0)) ;then break ;fi
 			done
 			if (( $ec == 1)) ;then
 				echo_msg !! "all avalible parent subvolumes failed. Attempting to send complete snapshot"
-				send_with($transp comp) 
+				send_with $transp comp 
 			fi
 
 
@@ -262,6 +262,19 @@ for x in $(grep -v "#" /etc/bss.conf) ; do
 	
 	IFS='
 	'
+
+	unset subn
+	unset snapfs
+	unset snapdir
+	unset snapsendloc
+	unset sshuh
+	unset sshid
+	unset subkeep
+	unset trans
+	unset ip
+	unset subnd
+
+
 done
 
 IFS=$IFS_bk
