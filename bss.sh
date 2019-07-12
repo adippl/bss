@@ -23,14 +23,14 @@ echo_msg(){
 		;;
 	esac
 }
-#exec_wrap(){	#doesn't work
-#	if [ DEBUG = "1" ] ;then
-#		echo "~~ DEBUG MODE is on, if it wasn't this command ↓↓↓↓↓ would have been executed"
-#		echo "$@"
-#	else
-#		$@
-#	fi
-#}
+exec_wrap(){	#doesn't work
+	if [ DEBUG = "1" ] ;then
+		echo_msg "!! DEBUG MODE is on, if it wasn't this command ↓↓↓↓↓ would have been executed"
+		echo_msg "!! $@"
+	else
+		bash -c "$@"
+	fi
+}
 
 
 bin_check(){
@@ -131,20 +131,25 @@ send_with () {
 			case $2 in
 				inc)
 					echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
-					ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+					#ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+					ssh -i $sshid  $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc &
+					bc=$!
 					sleep 1
 					echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0"
 					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
-					ec=${PIPESTATUS[1]}
+					wait $bc
+					ec=$?
 					return $ec
 					;;
 				comp)
 					echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
-					ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
+					ssh -i $sshid $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc &
+					bc=$!
 					sleep 1
 					echo_msg ~~ "btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0"
 					btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0
-					ec=${PIPESTATUS[1]}
+					wait $bc
+					ec=$?
 					return $ec
 					;;
 				*)
@@ -189,12 +194,13 @@ mount /mnt/a/		## this will be fixed, filesystem needs to be mouned on my partic
 IFS='
 '
 
-if test $1==""	#test for empty $1 argument
-then
-	conf_f="/etc/bss.conf"
-else
+#if test $1==""	#test for empty $1 argument
+#then
+#	conf_f="/etc/bss.conf"
+#else
+#	conf_f=$1
+#fi
 	conf_f=$1
-fi
 
 for x in $(grep -v "#" $conf_f) ; do
 	IFS=' 	' read -r -a linearray <<< $x
@@ -207,12 +213,12 @@ for x in $(grep -v "#" $conf_f) ; do
 	subkeep=${linearray[6]}
 	transp=${linearray[7]}
 #	cmprs=${linearray[8]}
-#	cmprs_de=${linearray[8]}
 	ip=$(echo $sshuh | cut -d '@' -f 2)
 	subnd="$subn-r-$(date +'%y%m%d')"
 
 	if [[ $DEBUG == '1' ]] ; then 
 		echo_msg ~~ "------------------------------------"
+		echo_msg ~~ "conf_f		"$conf_f
 		echo_msg ~~ "subn		"$subn
 		echo_msg ~~ "snapfs		"$snapfs
 		echo_msg ~~ "snapdir		"$snapdir
@@ -228,7 +234,7 @@ for x in $(grep -v "#" $conf_f) ; do
 	
 #	if ! [[ $cmprs == "" ]]		#unfinished
 #	then
-#		if test $cmprs == "lzma" || test $cmprs == "xz" || test $cmprs == "pxz"
+#		if [[ $cmprs == "lzma" ]] || [[ test $cmprs == "xz" ]] || [[ test $cmprs == "pxz" ]]
 #		then
 #			echo_msg !!
 #	fi
@@ -236,7 +242,6 @@ for x in $(grep -v "#" $conf_f) ; do
 #	cmprs="${linearray[8]} -z "
 #	cmprs_de="${linearray[8]} -d "
 	
-	#if [[ ! -d $snapdir/$subd ]]; then #doesn't work and I don't know why :/
 	if [[ -z $( ls -1 $snapdir | grep $subnd ) ]]; then
 	
 		echo == "creating snapshot "$snapdir'/'$subnd
