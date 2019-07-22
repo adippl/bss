@@ -72,29 +72,6 @@ doesexist (){
 	fi
 }
 
-#transp () { #unused
-#	case $transp in
-#		ssh)
-#			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
-#		;;
-#		nc)
-#			ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
-#			sleep 1
-#			btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
-#
-#		;;
-#		local)
-#			btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| ssh -i $sshid sshuh btrfs
-#		
-#		
-#		;;
-#		*)
-#		echo_msg !! "network option unhandled"
-#		;;
-#	esac
-#	
-#}
-
 send_with () {
 	case $1 in
 		ssh)
@@ -190,17 +167,16 @@ send_with () {
 }
 
 bin_check
-mount /mnt/a/		## this will be fixed, filesystem needs to be mouned on my particural machine
+mount /mnt/a/		# this will be fixed, filesystem needs to be mouned on my particural machine
 IFS='
 '
 
-#if test $1==""	#test for empty $1 argument
-#then
-#	conf_f="/etc/bss.conf"
-#else
-#	conf_f=$1
-#fi
+if test $1	#test for empty $1 argument
+then
 	conf_f=$1
+else
+	conf_f="/etc/bss.conf"
+fi
 
 for x in $(grep -v "#" $conf_f) ; do
 	IFS=' 	' read -r -a linearray <<< $x
