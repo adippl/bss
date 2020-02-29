@@ -4,6 +4,7 @@
 IFS_bk=$IFS
 
 temp_send_on_err_var=1
+MAXRETRY=10
 
 echo_msg(){
 	if [[ $DEBUG == "-1" ]] ;then 
@@ -31,6 +32,38 @@ exec_wrap(){	#doesn't work
 		bash -c "$@"
 	fi
 }
+
+#ping_test_connection(){	# host/ip ping_count/seconds
+#	packet_loss=$(ping $1 -c $2 |grep -Eo -e '[[:digit:]]{1,3}%' | sed 's/%$//')
+#	if (( packet_loss > 0 )) ; then
+#		echo $packet_loss
+#		return 1
+#	else
+#		return 0
+#	fi
+#}
+
+remoteCheckReadonly(){
+	#$1 user@host
+	#$2 path
+	if test "$(ssh -i $sshid $1 "btrfs sub show $2" | grep Flags | grep -o readonly)" == "readonly"; then
+		return 0
+	else
+		return 1
+	fi
+	}
+remoteCheckExist(){
+	#$1 user@host
+	#$2 path
+	ssh -i $sshid $1 "test -d $2"
+	return $?
+
+	}
+remoteDelete(){
+	#$1 user@host
+	#$2 path
+	ssh -i $sshid $1 "btrfs sub delete $2"
+	}
 
 
 bin_check(){
@@ -79,7 +112,6 @@ send_with () {
 				inc)
 					echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
 					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
-#echo_msg ~~ DEBUG EC 1-${PIPESTATUS[1]} 2-${PIPESTATUS[2]} 3-${PIPESTATUS[3]} 4-${PIPESTATUS[4]}
 					ec=${PIPESTATUS[2]}
 					return $ec
 					;;
@@ -108,7 +140,6 @@ send_with () {
 			case $2 in
 				inc)
 					echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
-					#ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc
 					ssh -i $sshid  $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc &
 					bc=$!
 					sleep 1
@@ -231,6 +262,19 @@ for x in $(grep -v "#" $conf_f) ; do
 		ec=$?
 		echo_msg ~~ sned exit code $ec
 		if (( $ec == 1 )) ; then
+			if remoteCheckExist $sshuh $snapsendloc/$subnd && ! remoteCheckReadonly $sshuh $snapsendloc/$subnd ; then
+				echo_msg !! "failed send, created snapshot is not readonly."
+					for x in $(seq 1 $MAXRETRY); do
+						remoteDelete $sshuh $snapsendloc/$subnd
+						echo_msg !! "attempting to resend, $x attempt."
+						send_with $transp inc
+						if remoteCheckReadonly $sshuh $snapsendloc/$subnd
+							then break
+							fi
+						done
+
+			fi
+			
 			echo_msg !! "error while sending subvolume"
 			for x in $(seq 3 $subkeep) ; do
 				snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n $x'p')
