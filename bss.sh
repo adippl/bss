@@ -105,6 +105,30 @@ doesexist (){
 	fi
 }
 
+sendSubvol_retry () {
+	send_with $1 $2
+	ec=$?
+	echo_msg ~~ "sned exit code $ec"
+	if (( $ec == 1 )) ; then
+		if remoteCheckExist $sshuh $snapsendloc/$subnd && ! remoteCheckReadonly $sshuh $snapsendloc/$subnd ; then
+			echo_msg !! "failed send, created snapshot is not readonly."
+				for x in $(seq 1 $MAXRETRY); do
+					remoteDelete $sshuh $snapsendloc/$subnd
+					echo_msg !! "attempting to resend, $x attempt."
+					send_with $transp inc
+					if remoteCheckReadonly $sshuh $snapsendloc/$subnd
+						then return 0
+						fi
+					done	
+				echo !! "all attempts to retry failed"
+				return 1
+			fi
+		return 1
+		fi
+
+}
+
+
 send_with () {
 	case $1 in
 		ssh)
@@ -258,22 +282,23 @@ for x in $(grep -v "#" $conf_f) ; do
 		echo_msg 	~~ "snapp	"$snapp
 		echo_msg 	~~ "snapf	"$snapf
 
-		send_with $transp inc
+		#send_with $transp inc
+		sendSubvol_retry $transp inc
 		ec=$?
-		echo_msg ~~ sned exit code $ec
+		echo_msg ~~ "sned exit code $ec"
 		if (( $ec == 1 )) ; then
-			if remoteCheckExist $sshuh $snapsendloc/$subnd && ! remoteCheckReadonly $sshuh $snapsendloc/$subnd ; then
-				echo_msg !! "failed send, created snapshot is not readonly."
-					for x in $(seq 1 $MAXRETRY); do
-						remoteDelete $sshuh $snapsendloc/$subnd
-						echo_msg !! "attempting to resend, $x attempt."
-						send_with $transp inc
-						if remoteCheckReadonly $sshuh $snapsendloc/$subnd
-							then break
-							fi
-						done
+			#if remoteCheckExist $sshuh $snapsendloc/$subnd && ! remoteCheckReadonly $sshuh $snapsendloc/$subnd ; then
+			#	echo_msg !! "failed send, created snapshot is not readonly."
+			#		for x in $(seq 1 $MAXRETRY); do
+			#			remoteDelete $sshuh $snapsendloc/$subnd
+			#			echo_msg !! "attempting to resend, $x attempt."
+			#			send_with $transp inc
+			#			if remoteCheckReadonly $sshuh $snapsendloc/$subnd
+			#				then break
+			#				fi
+			#			done
 
-			fi
+			#fi
 			
 			echo_msg !! "error while sending subvolume"
 			for x in $(seq 3 $subkeep) ; do
