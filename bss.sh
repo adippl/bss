@@ -1,5 +1,38 @@
 #!/bin/bash
 #btrfs-bin=btrfs
+#	bss.sh btrfs incremental backup script
+#	Copyright (C) 2020  Adam Prycki (email: <-REDACTED-> )
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 2 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>
+#
+#	Niniejszy program jest wolnym oprogramowaniem; możesz go
+#	rozprowadzać dalej i/lub modyfikować na warunkach Powszechnej
+#	Licencji Publicznej GNU, wydanej przez Fundację Wolnego
+#	Oprogramowania - według wersji 2 tej Licencji lub (według twojego
+#	wyboru) którejś z późniejszych wersji.
+#
+#	Niniejszy program rozpowszechniany jest z nadzieją, iż będzie on
+#	użyteczny - jednak BEZ JAKIEJKOLWIEK GWARANCJI, nawet domyślnej
+#	gwarancji PRZYDATNOŚCI HANDLOWEJ albo PRZYDATNOŚCI DO OKREŚLONYCH
+#	ZASTOSOWAŃ. W celu uzyskania bliższych informacji sięgnij do
+#	Powszechnej Licencji Publicznej GNU.
+#
+#	Z pewnością wraz z niniejszym programem otrzymałeś też egzemplarz
+#	Powszechnej Licencji Publicznej GNU (GNU General Public License);
+#	jeśli nie - zobacz <http://www.gnu.org/licenses/>.
+#
+
 
 IFS_bk=$IFS
 
@@ -151,25 +184,25 @@ send_with () {
 			esac
 			#case $ec in
 			#	0)
-			#	return 0
+			#	return Ma0
 			#	;;
 			#	1)
-			#	return 1
+			#	return 1Ma
 			#	;;
 			#esac
-			return $ec
-
+			return $ecMa
+		
 		;;
 		nc)
 			case $2 in
 				inc)
-					echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
+			Ma		echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
 					ssh -i $sshid  $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc &
 					bc=$!
-					sleep 1
+			Ma		sleep 1
 					echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0"
 					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
-					wait $bc
+			Ma		wait $bc
 					ec=$?
 					return $ec
 					;;
@@ -188,7 +221,7 @@ send_with () {
 					echo_msg !! "error"
 					;;
 			esac
-
+			
 			return $ec
 		;;
 		local)
@@ -233,7 +266,7 @@ else
 	conf_f="/etc/bss.conf"
 fi
 
-for x in $(grep -v "#" $conf_f) ; do
+for x in $(grep -v "^#" $conf_f) ; do
 	IFS=' 	' read -r -a linearray <<< $x
 	subn=${linearray[0]} 
 	snapfs=${linearray[1]}
@@ -243,10 +276,11 @@ for x in $(grep -v "#" $conf_f) ; do
 	sshid=${linearray[5]}
 	subkeep=${linearray[6]}
 	transp=${linearray[7]}
-#	cmprs=${linearray[8]}
+	#cmprs=${linearray[8]}
 	ip=$(echo $sshuh | cut -d '@' -f 2)
-	subnd="$subn-r-$(date +'%y%m%d')"
-
+	#subnd="$subn-r-$(date +'%y%m%d')"
+	subnd="$subn-r-$(date '+%Y%m%d-%H%M')"
+	
 	if [[ $DEBUG == '1' ]] ; then 
 		echo_msg ~~ "------------------------------------"
 		echo_msg ~~ "conf_f		"$conf_f
@@ -262,6 +296,7 @@ for x in $(grep -v "#" $conf_f) ; do
 		echo_msg ~~ "subnd		"$subnd
 		echo_msg ~~ "------------------------------------"
 	fi
+	echo;echo
 	
 #	if ! [[ $cmprs == "" ]]		#unfinished
 #	then
@@ -269,7 +304,7 @@ for x in $(grep -v "#" $conf_f) ; do
 #		then
 #			echo_msg !!
 #	fi
-	
+#	
 #	cmprs="${linearray[8]} -z "
 #	cmprs_de="${linearray[8]} -d "
 	
@@ -281,24 +316,12 @@ for x in $(grep -v "#" $conf_f) ; do
 		snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
 		echo_msg 	~~ "snapp	"$snapp
 		echo_msg 	~~ "snapf	"$snapf
-
+		
 		#send_with $transp inc
 		sendSubvol_retry $transp inc
 		ec=$?
 		echo_msg ~~ "sned exit code $ec"
 		if (( $ec == 1 )) ; then
-			#if remoteCheckExist $sshuh $snapsendloc/$subnd && ! remoteCheckReadonly $sshuh $snapsendloc/$subnd ; then
-			#	echo_msg !! "failed send, created snapshot is not readonly."
-			#		for x in $(seq 1 $MAXRETRY); do
-			#			remoteDelete $sshuh $snapsendloc/$subnd
-			#			echo_msg !! "attempting to resend, $x attempt."
-			#			send_with $transp inc
-			#			if remoteCheckReadonly $sshuh $snapsendloc/$subnd
-			#				then break
-			#				fi
-			#			done
-
-			#fi
 			
 			echo_msg !! "error while sending subvolume"
 			for x in $(seq 3 $subkeep) ; do
@@ -346,3 +369,5 @@ for x in $(grep -v "#" $conf_f) ; do
 done
 
 IFS=$IFS_bk
+
+# vim :ts=4:
