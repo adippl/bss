@@ -1,7 +1,6 @@
 #!/bin/bash
-#btrfs-bin=btrfs
 #	bss.sh btrfs incremental backup script
-#	Copyright (C) 2020  Adam Prycki (email: <-REDACTED-> )
+#	Copyright (C) 2021  Adam Prycki (email: <-REDACTED-> )
 #
 #	This program is free software: you can redistribute it and/or modify
 #	it under the terms of the GNU General Public License as published by
@@ -57,6 +56,9 @@ echo_msg(){
 		;;
 	esac
 }
+
+
+
 exec_wrap(){	#doesn't work
 	if [ DEBUG = "1" ] ;then
 		echo_msg "!! DEBUG MODE is on, if it wasn't this command ↓↓↓↓↓ would have been executed"
@@ -162,7 +164,7 @@ sendSubvol_retry () {
 }
 
 
-send_with () {
+function send_with () {
 	case $1 in
 		ssh)
 			case $2 in
@@ -182,48 +184,9 @@ send_with () {
 					echo_msg !! "error"
 					;;
 			esac
-			#case $ec in
-			#	0)
-			#	return Ma0
-			#	;;
-			#	1)
-			#	return 1Ma
-			#	;;
-			#esac
 			return $ecMa
+		;;
 		
-		;;
-		nc)
-			case $2 in
-				inc)
-			Ma		echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
-					ssh -i $sshid  $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc &
-					bc=$!
-			Ma		sleep 1
-					echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0"
-					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| nc $ip 9999 -q 0
-			Ma		wait $bc
-					ec=$?
-					return $ec
-					;;
-				comp)
-					echo_msg ~~ "ssh -i $sshid -f $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc"
-					ssh -i $sshid $sshuh 'nc -l -p 9999 -w 5 |btrfs receive '$snapsendloc &
-					bc=$!
-					sleep 1
-					echo_msg ~~ "btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0"
-					btrfs send $snapdir/$snapf |pv| nc $ip 9999 -q 0
-					wait $bc
-					ec=$?
-					return $ec
-					;;
-				*)
-					echo_msg !! "error"
-					;;
-			esac
-			
-			return $ec
-		;;
 		local)
 			#btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
 			case $2 in
@@ -247,6 +210,9 @@ send_with () {
 			esac
 			return $ec
 			;;
+		"snapOnly")
+			echo_msg "sendOnly option selected, not sending snapshot"
+			;;
 		*)
 			echo_msg !! "network option unhandled"
 			return 2
@@ -255,7 +221,6 @@ send_with () {
 }
 
 bin_check
-mount /mnt/a/		# this will be fixed, filesystem needs to be mouned on my particural machine
 IFS='
 '
 
@@ -296,7 +261,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 		echo_msg ~~ "subnd		"$subnd
 		echo_msg ~~ "------------------------------------"
 	fi
-	echo;echo
+	echo
 	
 #	if ! [[ $cmprs == "" ]]		#unfinished
 #	then
