@@ -37,46 +37,45 @@ IFS_bk=$IFS
 
 temp_send_on_err_var=1
 MAXRETRY=10
+set -e
 
-echo_msg(){
-	if [[ $DEBUG == "-1" ]] ;then 
-		echo $@
-	fi
-	case $1 in
-		"==")
-			echo $@
+
+NC='\033[0m' # No Color
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+msg(){
+	case "$2" in
+		"1")
+		printf "*\t$GREEN$1$NC \n" && return
 		;;
-		"~~")
-			if [[ $DEBUG == "1" ]] ;then
-				echo $@
-			fi
+		"2")
+		printf "\t*\t$GREEN$1$NC \n" && return
 		;;
-		"!!")
-			echo $@
+		*)
+		printf "$GREEN$1$NC \n" && return
 		;;
 	esac
-}
+	}
+msg_debug(){
+	if [ "$DEBUG" = 1 ] ;then
+		warn $1
+		fi 
+		}
+warn(){
+	printf "$YELLOW$1$NC \n"
+	}
+err(){
+	printf "$RED$1$NC \n"
+	}
 
 
+ping_test_connection(){
+	ping -c 1 $1
+	#if [ "$?" = 0 ] ; then 
+	return $?
+	}
 
-exec_wrap(){	#doesn't work
-	if [ DEBUG = "1" ] ;then
-		echo_msg "!! DEBUG MODE is on, if it wasn't this command ↓↓↓↓↓ would have been executed"
-		echo_msg "!! $@"
-	else
-		bash -c "$@"
-	fi
-}
-
-#ping_test_connection(){	# host/ip ping_count/seconds
-#	packet_loss=$(ping $1 -c $2 |grep -Eo -e '[[:digit:]]{1,3}%' | sed 's/%$//')
-#	if (( packet_loss > 0 )) ; then
-#		echo $packet_loss
-#		return 1
-#	else
-#		return 0
-#	fi
-#}
 
 remoteCheckReadonly(){
 	#$1 user@host
@@ -92,8 +91,8 @@ remoteCheckExist(){
 	#$2 path
 	ssh -i $sshid $1 "test -d $2"
 	return $?
-
 	}
+
 remoteDelete(){
 	#$1 user@host
 	#$2 path
@@ -104,38 +103,37 @@ remoteDelete(){
 bin_check(){
 	btrfsbin=$(whereis btrfs |awk '{print $2}')
 	if [[ -z $btrfsbin  ]] ;then
-		echo_msg !! "Couldn't find btrfs-progs binary on the system"
-		echo_msg !! "Exiting...."
+		err "Couldn't find btrfs-progs binary on the system"
+		err "Exiting...."
 		exit
 	fi
 	pvbin=$(whereis pv |awk '{print $2}')
 	if [[ -z $pvbin  ]] ;then
-		echo_msg !! "Couldn't find pv binary on the system"
+		err !! "Couldn't find pv binary on the system"
 		exit
 	fi
 }
 
-
-delsubvol () {
-	echo_msg == deleting snapshot $snapdir/$subnd
-	echo_msg $btrfs sub $subnd
+delsubvol(){
+	msg "deleting snapshot $snapdir/$subnd"
+	msg "$btrfs sub $subnd"
 }
 
-doesexist (){
+doesexist(){
 	ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn}"
 	ec=$?
 	#if [[ -e $detemp  ]] ; then
 	if test -s $ec
 	then
-		echo_msg == snapshot exists
+		msg "snapshot exists"
 		if [[ -e $(detemp|grep readonly) ]] ; then
-			echo_msg == snapshot read only, probably fine
+			msg snapshot read only, probably fine
 			return 0
 		else
-			echo_msg !! snapshot incomplete
+			err snapshot incomplete
 	#		delsubvol()
 		fi
-	echo_msg !! "snapshot trasnfer failed"
+	err "snapshot trasnfer failed"
 	#subvoldel()
 	fi
 }
@@ -143,19 +141,19 @@ doesexist (){
 sendSubvol_retry () {
 	send_with $1 $2
 	ec=$?
-	echo_msg ~~ "sned exit code $ec"
+	msg_debug "sned exit code $ec"
 	if (( $ec == 1 )) ; then
 		if remoteCheckExist $sshuh $snapsendloc/$subnd && ! remoteCheckReadonly $sshuh $snapsendloc/$subnd ; then
-			echo_msg !! "failed send, created snapshot is not readonly."
+			msg "failed send, created snapshot is not readonly."
 				for x in $(seq 1 $MAXRETRY); do
 					remoteDelete $sshuh $snapsendloc/$subnd
-					echo_msg !! "attempting to resend, $x attempt."
+					msg "attempting to resend, $x attempt."
 					send_with $transp inc
 					if remoteCheckReadonly $sshuh $snapsendloc/$subnd
 						then return 0
 						fi
 					done	
-				echo !! "all attempts to retry failed"
+				err "all attempts to retry failed"
 				return 1
 			fi
 		return 1
@@ -169,19 +167,17 @@ function send_with () {
 		ssh)
 			case $2 in
 				inc)
-					echo_msg ~~ "btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
 					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
 					ec=${PIPESTATUS[2]}
 					return $ec
 					;;
 				comp)
-					echo_msg ~~ "btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc"
 					btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
 					ec=${PIPESTATUS[2]}
 					return $ec
 					;;
 				*)
-					echo_msg !! "error"
+					err "error"
 					;;
 			esac
 			return $ecMa
@@ -191,30 +187,28 @@ function send_with () {
 			#btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
 			case $2 in
 				inc)
-					echo_msg ~~ "btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc"
 					btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
 					ec=${PIPESTATUS[3]}
 					return $ec
 					;;
 				comp)
-					echo_msg !! "sending complete subvolume"
-					echo_msg ~~ "btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc"
+					msg "sending complete subvolume"
 					btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
 					ec=${PIPESTATUS[3]}
 					return $ec
 					;;
 				*)
-					echo_msg !! "error"
+					err "error"
 					return 1
 					;;
 			esac
 			return $ec
 			;;
 		"snapOnly")
-			echo_msg "sendOnly option selected, not sending snapshot"
+			msg "sendOnly option selected, not sending snapshot"
 			;;
 		*)
-			echo_msg !! "network option unhandled"
+			err "network option unhandled"
 			return 2
 		;;
 	esac
@@ -223,12 +217,12 @@ function send_with () {
 bin_check
 IFS='
 '
+#test for empty $1 argument
 
-if test $1	#test for empty $1 argument
-then
+if [ "$1" != "" ] ;then
 	conf_f=$1
 else
-	conf_f="/etc/bss.conf"
+	conf_f="/etc/bsstab"
 fi
 
 for x in $(grep -v "^#" $conf_f) ; do
@@ -242,78 +236,67 @@ for x in $(grep -v "^#" $conf_f) ; do
 	subkeep=${linearray[6]}
 	transp=${linearray[7]}
 	#cmprs=${linearray[8]}
-	ip=$(echo $sshuh | cut -d '@' -f 2)
+	ip=$(cut -d '@' -f 2 <<< "$sshuh" )
 	#subnd="$subn-r-$(date +'%y%m%d')"
 	subnd="$subn-r-$(date '+%Y%m%d-%H%M')"
 	
-	if [[ $DEBUG == '1' ]] ; then 
-		echo_msg ~~ "------------------------------------"
-		echo_msg ~~ "conf_f		"$conf_f
-		echo_msg ~~ "subn		"$subn
-		echo_msg ~~ "snapfs		"$snapfs
-		echo_msg ~~ "snapdir		"$snapdir
-		echo_msg ~~ "snapsendloc	"$snapsendloc
-		echo_msg ~~ "sshuh		"$sshuh
-		echo_msg ~~ "sshid		"$sshid
-		echo_msg ~~ "subkeep		"$subkeep
-		echo_msg ~~ "transp		"$transp
-		echo_msg ~~ "'ip(from sshuh)'	"$ip
-		echo_msg ~~ "subnd		"$subnd
-		echo_msg ~~ "------------------------------------"
+	if [ "$DEBUG" = 1 ] ; then 
+		msg_debug "------------------------------------"
+		msg_debug "conf_f		$conf_f"
+		msg_debug "subn		$subn"
+		msg_debug "snapfs		$snapfs"
+		msg_debug "snapdir		$snapdir"
+		msg_debug "snapsendloc	$snapsendloc"
+		msg_debug "sshuh		$sshuh"
+		msg_debug "sshid		$sshid"
+		msg_debug "subkeep		$subkeep"
+		msg_debug "transp		$transp"
+		msg_debug "'ip(from sshuh)'	$ip"
+		msg_debug "subnd		$subnd"
+		msg_debug ""
+		msg_debug "------------------------------------"
 	fi
-	echo
-	
-#	if ! [[ $cmprs == "" ]]		#unfinished
-#	then
-#		if [[ $cmprs == "lzma" ]] || [[ test $cmprs == "xz" ]] || [[ test $cmprs == "pxz" ]]
-#		then
-#			echo_msg !!
-#	fi
-#	
-#	cmprs="${linearray[8]} -z "
-#	cmprs_de="${linearray[8]} -d "
 	
 	if [[ -z $( ls -1 $snapdir | grep $subnd ) ]]; then
 	
-		echo == "creating snapshot "$snapdir'/'$subnd
+		msg "creating snapshot $snapdir/$subnd"
 		btrfs sub snap -r $snapfs $snapdir/$subnd
 		snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
 		snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
-		echo_msg 	~~ "snapp	"$snapp
-		echo_msg 	~~ "snapf	"$snapf
+		msg_debug "snapp	$snapp"
+		msg_debug "snapf	$snapf"
 		
-		#send_with $transp inc
 		sendSubvol_retry $transp inc
 		ec=$?
-		echo_msg ~~ "sned exit code $ec"
-		if (( $ec == 1 )) ; then
+		msg_debug "sned exit code $ec"
+		if [ "$ec" = 1 ] ; then
 			
-			echo_msg !! "error while sending subvolume"
+			msg_debug "error while sending subvolume"
 			for x in $(seq 3 $subkeep) ; do
 				snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n $x'p')
-				if [[ $snapp == "" ]] ;then
-					echo !! "subvolume missing"
+				if [[ "$snapp" == "" ]] ;then
+					err "subvolume missing"
 					ec=1
 					break
 				fi
-				echo_msg !! "attempting to send using older parent"
-				echo_msg 	~~ "snapp	"$snapp
-				echo_msg 	~~ "snapf	"$snapf
+				err "attempting to send using older parent"
+				msg_debug  "snapp	$snapp"
+				msg_debug  "snapf	$snapf"
 				send_with $transp inc
 				ec=$?
-				if (( $ec == 0)) ;then break ;fi
+				if [ $ec = 0 ] ;then break ;fi
 			done
-			if (( $ec == 1)) ;then
-				echo_msg !! "all avalible parent subvolumes failed. Attempting to send complete snapshot"
+			if [ "$ec" == 1 ] ;then
+				err "all avalible parent subvolumes failed. Attempting to send complete snapshot"
 				send_with $transp comp 
 			fi
 		fi
 	else
-		echo_msg !! "snapshot already exists!"
+		err "snapshot already exists!"
 	fi
 	
 	for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $subkeep',$p'); do 
-		echo_msg ~~ "btrfs sub del "$snapdir'/'$x
+		msg_debug "btrfs sub del $snapdir/$x"
 		btrfs sub del $snapdir/$x
 	done
 	

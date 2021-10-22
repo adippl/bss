@@ -25,9 +25,9 @@
 #	5th username@ip for ssh command. (ip or hostname used also for nc command)
 #	6th absolute path to ssh public key
 #	7th number of subvolumes to keep stored locally
-#	8th transport methon [ssh, nc, local]
-#	9th transport compression method [zstd, pzstd, lzma] #### NOT INPLEMENTED YET
-root	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	/path_of_backup_dir/	root@10.0.0.2			/path/to/key.pub	5	ssh
-home	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	/path_of_backup_dir/	root@hostname.local		/path/to/key.pub	5	ssh
-home	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	/path_of_backup_dir/	NULL					NULL				5	local
-home	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	/path_of_backup_dir/	NULL					NULL				5	snapOnly
+#	8th transport methon [ssh, local, snapOnly]
+#	9th sender/puller mode
+root	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	/path_of_backup_dir/	root@10.0.0.2		/path/to/key.pub	5	ssh		
+home	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	/path_of_backup_dir/	root@hostname.local	/path/to/key.pub	5	ssh		
+home	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	/path_of_backup_dir/	NULL			NULL			5	local		
+home	/path/to/snapshotted/subvolume	/path/to/local/snapshot/dir/	NULL			NULL			NULL			5	snapOnly	
