@@ -76,6 +76,13 @@ ping_test_connection(){
 	return $?
 	}
 
+bss_ls_snapdir(){
+	if [ "$sendpull" != "pull" ] ; then
+		ls $snapdir
+	else
+		ssh -i $sshid $sshuh ls $snapdir
+	fi
+}
 
 remoteCheckReadonly(){
 	#$1 user@host
@@ -288,18 +295,16 @@ for x in $(grep -v "^#" $conf_f) ; do
 		msg_debug "------------------------------------"
 	fi
 	
-	if [[ -z $( ls -1 $snapdir | grep $subnd ) ]]; then
+	if [ -z $( bss_ls_snapdir | grep $subnd ) ] ; then
 	
 		msg "creating snapshot $snapdir/$subnd"
-		if [ "$sendpull" = "pull" ] ; then
-			ssh -i $sshid $sshuh  btrfs sub snap -r $snapfs $snapdir/$subnd
-			snapp=$(ssh -i $sshid $sshuh ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
-			snapf=$(ssh -i $sshid $sshuh ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
-		else
+		if [ "$sendpull" != "pull" ] ; then
 			btrfs sub snap -r $snapfs $snapdir/$subnd
-			snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
-			snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
+		else
+			ssh -i $sshid $sshuh btrfs sub snap -r $snapfs $snapdir/$subnd
 		fi
+		snapp=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 2p)
+		snapf=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 1p)
 		msg_debug "snapp	$snapp"
 		msg_debug "snapf	$snapf"
 		
@@ -310,7 +315,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 			
 			msg_debug "error while sending subvolume"
 			for x in $(seq 3 $sub_keep) ; do
-				snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n $x'p')
+				snapp=$(bss_ls_snapdir |grep $subn|sort -r|sed -n $x'p')
 				if [[ "$snapp" == "" ]] ;then
 					err "subvolume missing"
 					ec=1
@@ -329,7 +334,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 			fi
 		fi
 	else
-		err "snapshot already exists!"
+		err "snapshot $snapdir/$subnd already exists!"
 	fi
 	
 	if [ "$sendpull" = "pull" ] ; then
