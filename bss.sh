@@ -37,7 +37,7 @@ IFS_bk=$IFS
 
 temp_send_on_err_var=1
 MAXRETRY=10
-set -e
+#set -e
 
 
 NC='\033[0m' # No Color
@@ -80,17 +80,29 @@ ping_test_connection(){
 remoteCheckReadonly(){
 	#$1 user@host
 	#$2 path
-	if test "$(ssh -i $sshid $1 "btrfs sub show $2" | grep Flags | grep -o readonly)" == "readonly"; then
-		return 0
+ 
+	if [ "$sendpull" != "pull" ] && [ "$transp" = "ssh" ] ; then
+		if test "$(ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subnd" | grep Flags | grep -o readonly)" == "readonly"; then
+			return 0
+		else
+			return 1
+		fi
 	else
-		return 1
+		if test "$(btrfs sub show $snapsendloc/$subnd | grep Flags | grep -o readonly)" == "readonly"; then
+			return 0
+		else
+			return 1
+		fi
 	fi
 	}
 remoteCheckExist(){
-	#$1 user@host
-	#$2 path
-	ssh -i $sshid $1 "test -d $2"
-	return $?
+	if [ "$sendpull" != "pull" ] && [ "$transp" = "ssh" ] ; then
+		ssh -i $sshid $sshuh "test -d $snapsendloc/$subnd"
+		return $?
+	else
+		test -d $snapsendloc/$subnd
+		return $?
+	fi
 	}
 
 remoteDelete(){
@@ -139,7 +151,7 @@ doesexist(){
 }
 
 sendSubvol_retry () {
-	send_with $1 $2
+	send_with $1 $2 $3
 	ec=$?
 	msg_debug "sned exit code $ec"
 	if (( $ec == 1 )) ; then
@@ -148,7 +160,7 @@ sendSubvol_retry () {
 				for x in $(seq 1 $MAXRETRY); do
 					remoteDelete $sshuh $snapsendloc/$subnd
 					msg "attempting to resend, $x attempt."
-					send_with $transp inc
+					send_with $transp inc $3
 					if remoteCheckReadonly $sshuh $snapsendloc/$subnd
 						then return 0
 						fi
@@ -164,53 +176,71 @@ sendSubvol_retry () {
 
 function send_with () {
 	case $1 in
-		ssh)
+	ssh)
+		if [ "$sendpull" != "pull" ] ; then
 			case $2 in
-				inc)
-					btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
-					ec=${PIPESTATUS[2]}
-					return $ec
-					;;
-				comp)
-					btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
-					ec=${PIPESTATUS[2]}
-					return $ec
-					;;
-				*)
-					err "error"
-					;;
+			inc)
+				btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
+				ec=${PIPESTATUS[2]}
+				return $ec
+				;;
+			comp)
+				btrfs send $snapdir/$snapf |pv| ssh -i $sshid $sshuh btrfs receive $snapsendloc
+				ec=${PIPESTATUS[2]}
+				return $ec
+				;;
+			*)
+				err "error"
+				;;
 			esac
 			return $ecMa
-		;;
-		
-		local)
-			#btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
+		else
 			case $2 in
-				inc)
-					btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
-					ec=${PIPESTATUS[3]}
-					return $ec
-					;;
-				comp)
-					msg "sending complete subvolume"
-					btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
-					ec=${PIPESTATUS[3]}
-					return $ec
-					;;
-				*)
-					err "error"
-					return 1
-					;;
+			inc)
+				ssh -i $sshid $sshuh btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| btrfs receive $snapsendloc
+				ec=${PIPESTATUS[2]}
+				return $ec
+				;;
+			comp)
+				ssh -i $sshid $sshuh btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
+				ec=${PIPESTATUS[2]}
+				return $ec
+				;;
+			*)
+				err "error"
+				;;
 			esac
+			return $ecMa
+		fi
+	;;
+	
+	local)
+		case $2 in
+		inc)
+			btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
+			ec=${PIPESTATUS[3]}
 			return $ec
 			;;
-		"snapOnly")
-			msg "sendOnly option selected, not sending snapshot"
+		comp)
+			msg "sending complete subvolume"
+			btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
+			ec=${PIPESTATUS[3]}
+			return $ec
 			;;
 		*)
-			err "network option unhandled"
-			return 2
+			err "error"
+			return 1
+			;;
+		esac
+		return $ec
 		;;
+	"snapOnly")
+		msg "sendOnly option selected, not sending snapshot"
+		;;
+	*)
+		err "network option unhandled"
+		return 2
+	;;
 	esac
 }
 
@@ -233,9 +263,10 @@ for x in $(grep -v "^#" $conf_f) ; do
 	snapsendloc=${linearray[3]}
 	sshuh=${linearray[4]}
 	sshid=${linearray[5]}
-	subkeep=${linearray[6]}
+	sub_keep=${linearray[6]}
 	transp=${linearray[7]}
-	#cmprs=${linearray[8]}
+	sendpull=${linearray[8]}
+	sub_keep_remote=${linearray[9]}
 	ip=$(cut -d '@' -f 2 <<< "$sshuh" )
 	#subnd="$subn-r-$(date +'%y%m%d')"
 	subnd="$subn-r-$(date '+%Y%m%d-%H%M')"
@@ -249,7 +280,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 		msg_debug "snapsendloc	$snapsendloc"
 		msg_debug "sshuh		$sshuh"
 		msg_debug "sshid		$sshid"
-		msg_debug "subkeep		$subkeep"
+		msg_debug "sub_keep		$sub_keep"
 		msg_debug "transp		$transp"
 		msg_debug "'ip(from sshuh)'	$ip"
 		msg_debug "subnd		$subnd"
@@ -260,19 +291,25 @@ for x in $(grep -v "^#" $conf_f) ; do
 	if [[ -z $( ls -1 $snapdir | grep $subnd ) ]]; then
 	
 		msg "creating snapshot $snapdir/$subnd"
-		btrfs sub snap -r $snapfs $snapdir/$subnd
-		snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
-		snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
+		if [ "$sendpull" = "pull" ] ; then
+			ssh -i $sshid $sshuh  btrfs sub snap -r $snapfs $snapdir/$subnd
+			snapp=$(ssh -i $sshid $sshuh ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
+			snapf=$(ssh -i $sshid $sshuh ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
+		else
+			btrfs sub snap -r $snapfs $snapdir/$subnd
+			snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n 2p)
+			snapf=$(ls $snapdir -1|grep $subn|sort -r|sed -n 1p)
+		fi
 		msg_debug "snapp	$snapp"
 		msg_debug "snapf	$snapf"
 		
-		sendSubvol_retry $transp inc
+		sendSubvol_retry $transp inc $sendpull
 		ec=$?
 		msg_debug "sned exit code $ec"
 		if [ "$ec" = 1 ] ; then
 			
 			msg_debug "error while sending subvolume"
-			for x in $(seq 3 $subkeep) ; do
+			for x in $(seq 3 $sub_keep) ; do
 				snapp=$(ls $snapdir -1|grep $subn|sort -r|sed -n $x'p')
 				if [[ "$snapp" == "" ]] ;then
 					err "subvolume missing"
@@ -295,21 +332,33 @@ for x in $(grep -v "^#" $conf_f) ; do
 		err "snapshot already exists!"
 	fi
 	
-	for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $subkeep',$p'); do 
-		msg_debug "btrfs sub del $snapdir/$x"
-		btrfs sub del $snapdir/$x
-	done
+	if [ "$sendpull" = "pull" ] ; then
+		msg "deleting older subvolumes on client"
+		for x in $(ssh -i $sshid $sshuh ls -1 $snapdir |grep $subn|sort -r|sed -n $sub_keep',$p'); do 
+			ssh -i $sshid $sshuh btrfs sub del $snapdir/$x
+		done
+		msg "deleting older local subvolumes"
+		for x in $(ls -1 $snapsendloc |grep $subn|sort -r|sed -n $sub_keep_remote',$p'); do 
+			btrfs sub del $snapsendloc/$x
+		done
+	else
+		msg "deleting older local subvolumes"
+		for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $sub_keep',$p'); do 
+			btrfs sub del $snapdir/$x
+		done
+	fi
 	
 	IFS='
 	'
-
+	
 	unset subn
 	unset snapfs
 	unset snapdir
 	unset snapsendloc
+	unset sub_keep_remote
 	unset sshuh
 	unset sshid
-	unset subkeep
+	unset sub_keep
 	unset trans
 	unset ip
 	unset subnd

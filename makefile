@@ -1,12 +1,28 @@
 ifeq ($(PREFIX),)
-    PREFIX := /usr/local
+    PREFIX := /usr
 endif
 
-install:
-	cp bss.sh $(PREFIX)/bin/bss.sh
-	chmod +x $(PREFIX)/bin/bss.sh
-	cp bss.conf /etc/bss.conf
+ifeq ($(DESTDIR),)
+    DESTDIR := 
+endif
 
-uinstall:
-	rm $(PREFIX)/bin/bss.sh
-	rm /etc/bss.conf
+
+
+local_install:
+	$(eval PREFIX := /usr/local)
+	install -Dm 700 bss.sh $(DESTDIR)$(PREFIX)/bin/bss.sh
+	install -Dm 660 bsstab $(DESTDIR)/etc/bsstab
+
+
+install:
+	install -Dm 700 bss.sh $(DESTDIR)$(PREFIX)/bin/bss.sh
+	install -Dm 660 bsstab $(DESTDIR)/etc/bsstab
+
+local_uninstall:
+	$(eval PREFIX := /usr/local)
+	rm $(DESTDIR)$(PREFIX)/bin/bss.sh
+	rm $(DESTDIR)/etc/bsstab
+
+uninstall:
+	rm $(DESTDIR)$(PREFIX)/bin/bss.sh
+	rm $(DESTDIR)/etc/bsstab
