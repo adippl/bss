@@ -8,13 +8,13 @@ endif
 
 
 
-local_install:
-	$(eval PREFIX := /usr/local)
+
+install:
 	install -Dm 700 bss.sh $(DESTDIR)$(PREFIX)/bin/bss.sh
 	install -Dm 660 bsstab $(DESTDIR)/etc/bsstab
 
-
-install:
+local_install:
+	$(eval PREFIX := /usr/local)
 	install -Dm 700 bss.sh $(DESTDIR)$(PREFIX)/bin/bss.sh
 	install -Dm 660 bsstab $(DESTDIR)/etc/bsstab
 
