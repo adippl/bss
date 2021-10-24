@@ -7,6 +7,8 @@ ifeq ($(DESTDIR),)
 endif
 
 
+make:
+	echo nothing to compile
 
 
 install:
