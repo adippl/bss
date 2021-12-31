@@ -44,6 +44,15 @@ NC='\033[0m' # No Color
 RED='\033[1;31m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
+
+#quick hack
+if [ "$TERM" != "rxvt-unicode" ] ; then
+	unset NC
+	unset RED
+	unset GREEN
+	unset YELLOW
+fi
+	
 msg(){
 	case "$2" in
 		"1")
@@ -297,16 +306,17 @@ for x in $(grep -v "^#" $conf_f) ; do
 	
 	if [ -z $( bss_ls_snapdir | grep $subnd ) ] ; then
 	
-		msg "creating snapshot $snapdir/$subnd"
 		if [ "$sendpull" != "pull" ] ; then
+			msg "creating snapshot $snapdir/$subnd"
 			btrfs sub snap -r $snapfs $snapdir/$subnd
 		else
+			msg "creating snapshot $snapdir/$subnd on $sshuh"
 			ssh -i $sshid $sshuh btrfs sub snap -r $snapfs $snapdir/$subnd
 		fi
 		snapp=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 2p)
 		snapf=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 1p)
-		msg_debug "snapp	$snapp"
-		msg_debug "snapf	$snapf"
+		msg_debug "snapp $snapp"
+		msg_debug "snapf $snapf"
 		
 		sendSubvol_retry $transp inc $sendpull
 		ec=$?
