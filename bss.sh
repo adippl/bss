@@ -305,7 +305,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 	fi
 	
 	if [ -z $( bss_ls_snapdir | grep $subnd ) ] ; then
-	
+	echo "===================="
 		if [ "$sendpull" != "pull" ] ; then
 			msg "creating snapshot $snapdir/$subnd"
 			btrfs sub snap -r $snapfs $snapdir/$subnd
@@ -336,6 +336,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 				msg_debug  "snapf	$snapf"
 				send_with $transp inc
 				ec=$?
+				echo "ec=$ec"
 				if [ $ec = 0 ] ;then break ;fi
 			done
 			if [ "$ec" == 1 ] ;then
