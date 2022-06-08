@@ -53,7 +53,26 @@ if [ "$TERM" != "rxvt-unicode" ] ; then
 	unset YELLOW
 fi
 	
+msg_white(){
+	if is_quiet ; then
+		return
+	fi
+	case "$2" in
+		"1")
+		printf "*\t$NC$1$NC \n" && return
+		;;
+		"2")
+		printf "\t*\t$NC$1$NC \n" && return
+		;;
+		*)
+		printf "$NC$1$NC \n" && return
+		;;
+	esac
+	}
 msg(){
+	if is_quiet ; then
+		return
+	fi
 	case "$2" in
 		"1")
 		printf "*\t$GREEN$1$NC \n" && return
@@ -260,6 +279,10 @@ function send_with () {
 	esac
 }
 
+is_quiet(){
+	[ $QUIET -eq 1 ] && return 0 #return true
+}
+
 bin_check
 IFS='
 '
@@ -289,26 +312,36 @@ for x in $(grep -v "^#" $conf_f) ; do
 	
 	if [ "$DEBUG" = 1 ] ; then 
 		msg_debug "------------------------------------"
-		msg_debug "conf_f		$conf_f"
-		msg_debug "subn		$subn"
-		msg_debug "snapfs		$snapfs"
-		msg_debug "snapdir		$snapdir"
-		msg_debug "snapsendloc	$snapsendloc"
-		msg_debug "sshuh		$sshuh"
-		msg_debug "sshid		$sshid"
+		msg_debug "conf_f			$conf_f"
+		msg_debug "subn			$subn"
+		msg_debug "snapfs			$snapfs"
+		msg_debug "snapdir			$snapdir"
+		msg_debug "snapsendloc		$snapsendloc"
+		msg_debug "sshuh			$sshuh"
+		msg_debug "sshid			$sshid"
 		msg_debug "sub_keep		$sub_keep"
-		msg_debug "transp		$transp"
+		msg_debug "transp			$transp"
 		msg_debug "'ip(from sshuh)'	$ip"
-		msg_debug "subnd		$subnd"
+		msg_debug "subnd			$subnd"
+		msg_debug "sendpull		$sendpull"
+		msg_debug "sub_keep_remote	$sub_keep_remote"
 		msg_debug ""
 		msg_debug "------------------------------------"
 	fi
 	
+	quiet_snapOnly="1"
+	#quiet_snapOnly="0"
+	[ "$transp" = "snapOnly" ] && [ "$quiet_snapOnly"="1" ] && QUIET=1
+	
 	if [ -z $( bss_ls_snapdir | grep $subnd ) ] ; then
-	echo "===================="
+	msg_white "===================="
 		if [ "$sendpull" != "pull" ] ; then
 			msg "creating snapshot $snapdir/$subnd"
-			btrfs sub snap -r $snapfs $snapdir/$subnd
+			if is_quiet ; then 
+				btrfs sub snap -r $snapfs $snapdir/$subnd 1>/dev/null
+			else
+				btrfs sub snap -r $snapfs $snapdir/$subnd
+			fi
 		else
 			msg "creating snapshot $snapdir/$subnd on $sshuh"
 			ssh -i $sshid $sshuh btrfs sub snap -r $snapfs $snapdir/$subnd
@@ -360,7 +393,11 @@ for x in $(grep -v "^#" $conf_f) ; do
 	else
 		msg "deleting older local subvolumes"
 		for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $sub_keep',$p'); do 
-			btrfs sub del $snapdir/$x
+			if is_quiet ; then 
+				btrfs sub del $snapdir/$x 1>/dev/null
+			else
+				btrfs sub del $snapdir/$x
+			fi
 		done
 	fi
 	
