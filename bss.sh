@@ -44,6 +44,7 @@ NC='\033[0m' # No Color
 RED='\033[1;31m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
+DOAS="doas"
 
 #quick hack
 if [ "$TERM" != "rxvt-unicode" ] ; then
@@ -117,7 +118,7 @@ remoteCheckReadonly(){
 	#$2 path
  
 	if [ "$sendpull" != "pull" ] && [ "$transp" = "ssh" ] ; then
-		if test "$(ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subnd" | grep Flags | grep -o readonly)" == "readonly"; then
+		if test "$(ssh -i $sshid $sshuh "$DOAS btrfs sub show $snapsendloc/$subnd" | grep Flags | grep -o readonly)" == "readonly"; then
 			return 0
 		else
 			return 1
@@ -344,7 +345,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 			fi
 		else
 			msg "creating snapshot $snapdir/$subnd on $sshuh"
-			ssh -i $sshid $sshuh btrfs sub snap -r $snapfs $snapdir/$subnd
+			ssh -i $sshid $sshuh $DOAS btrfs sub snap -r $snapfs $snapdir/$subnd
 		fi
 		snapp=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 2p)
 		snapf=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 1p)
@@ -384,7 +385,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 	if [ "$sendpull" = "pull" ] ; then
 		msg "deleting older subvolumes on client"
 		for x in $(ssh -i $sshid $sshuh ls -1 $snapdir |grep $subn|sort -r|sed -n $sub_keep',$p'); do 
-			ssh -i $sshid $sshuh btrfs sub del $snapdir/$x
+			ssh -i $sshid $sshuh $DOAS btrfs sub del $snapdir/$x
 		done
 		msg "deleting older local subvolumes"
 		for x in $(ls -1 $snapsendloc |grep $subn|sort -r|sed -n $sub_keep_remote',$p'); do 
