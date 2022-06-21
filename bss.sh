@@ -170,11 +170,10 @@ delsubvol(){
 doesexist(){
 	ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn}"
 	ec=$?
-	#if [[ -e $detemp  ]] ; then
 	if test -s $ec
 	then
 		msg "snapshot exists"
-		if [[ -e $(detemp|grep readonly) ]] ; then
+		if [[ -e $(detemp | grep readonly) ]] ; then
 			msg snapshot read only, probably fine
 			return 0
 		else
@@ -313,17 +312,17 @@ for x in $(grep -v "^#" $conf_f) ; do
 	
 	if [ "$DEBUG" = 1 ] ; then 
 		msg_debug "------------------------------------"
-		msg_debug "conf_f			$conf_f"
-		msg_debug "subn			$subn"
-		msg_debug "snapfs			$snapfs"
-		msg_debug "snapdir			$snapdir"
-		msg_debug "snapsendloc		$snapsendloc"
-		msg_debug "sshuh			$sshuh"
-		msg_debug "sshid			$sshid"
+		msg_debug "conf_f		$conf_f"
+		msg_debug "subn		$subn"
+		msg_debug "snapfs		$snapfs"
+		msg_debug "snapdir		$snapdir"
+		msg_debug "snapsendloc	$snapsendloc"
+		msg_debug "sshuh		$sshuh"
+		msg_debug "sshid		$sshid"
 		msg_debug "sub_keep		$sub_keep"
-		msg_debug "transp			$transp"
+		msg_debug "transp		$transp"
 		msg_debug "'ip(from sshuh)'	$ip"
-		msg_debug "subnd			$subnd"
+		msg_debug "subnd		$subnd"
 		msg_debug "sendpull		$sendpull"
 		msg_debug "sub_keep_remote	$sub_keep_remote"
 		msg_debug ""
@@ -347,8 +346,8 @@ for x in $(grep -v "^#" $conf_f) ; do
 			msg "creating snapshot $snapdir/$subnd on $sshuh"
 			ssh -i $sshid $sshuh $DOAS btrfs sub snap -r $snapfs $snapdir/$subnd
 		fi
-		snapp=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 2p)
-		snapf=$(bss_ls_snapdir |grep $subn|sort -r|sed -n 1p)
+		snapp=$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n 2p)
+		snapf=$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n 1p)
 		msg_debug "snapp $snapp"
 		msg_debug "snapf $snapf"
 		
@@ -359,7 +358,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 			
 			msg_debug "error while sending subvolume"
 			for x in $(seq 3 $sub_keep) ; do
-				snapp=$(bss_ls_snapdir |grep $subn|sort -r|sed -n $x'p')
+				snapp=$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n $x'p')
 				if [[ "$snapp" == "" ]] ;then
 					err "subvolume missing"
 					ec=1
@@ -384,16 +383,16 @@ for x in $(grep -v "^#" $conf_f) ; do
 	
 	if [ "$sendpull" = "pull" ] ; then
 		msg "deleting older subvolumes on client"
-		for x in $(ssh -i $sshid $sshuh ls -1 $snapdir |grep $subn|sort -r|sed -n $sub_keep',$p'); do 
+		for x in $(ssh -i $sshid $sshuh ls -1 $snapdir |grep "^$subn-r-" |sort -r |sed -n $sub_keep',$p'); do
 			ssh -i $sshid $sshuh $DOAS btrfs sub del $snapdir/$x
 		done
 		msg "deleting older local subvolumes"
-		for x in $(ls -1 $snapsendloc |grep $subn|sort -r|sed -n $sub_keep_remote',$p'); do 
+		for x in $(ls -1 $snapsendloc |grep "^$subn-r-" |sort -r |sed -n $sub_keep_remote',$p'); do
 			btrfs sub del $snapsendloc/$x
 		done
 	else
 		msg "deleting older local subvolumes"
-		for x in $(ls -1 $snapdir |grep $subn|sort -r|sed -n $sub_keep',$p'); do 
+		for x in $(ls -1 $snapdir |grep "^$subn-r-" |sort -r |sed -n $sub_keep',$p'); do
 			if is_quiet ; then 
 				btrfs sub del $snapdir/$x 1>/dev/null
 			else
