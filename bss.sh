@@ -232,12 +232,12 @@ function send_with () {
 		else
 			case $2 in
 			inc)
-				ssh -i $sshid $sshuh btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| btrfs receive $snapsendloc
+				ssh -i $sshid $sshuh $DOAS btrfs send -p $snapdir/$snapp $snapdir/$snapf |pv| btrfs receive $snapsendloc
 				ec=${PIPESTATUS[2]}
 				return $ec
 				;;
 			comp)
-				ssh -i $sshid $sshuh btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
+				ssh -i $sshid $sshuh $DOAS btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
 				ec=${PIPESTATUS[2]}
 				return $ec
 				;;
@@ -280,7 +280,7 @@ function send_with () {
 }
 
 is_quiet(){
-	[ $QUIET -eq 1 ] && return 0 #return true
+	[ "$QUIET" = "1" ] && return 0 #return true
 }
 
 bin_check
