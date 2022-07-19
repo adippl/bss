@@ -47,7 +47,7 @@ YELLOW='\033[1;33m'
 DOAS="doas"
 
 #quick hack
-if [ "$TERM" != "rxvt-unicode" ] ; then
+if [ "$TERM" != "rxvt-unicode" ] || [ "$TERM" != "screen" ]  ; then
 	unset NC
 	unset RED
 	unset GREEN
@@ -88,7 +88,8 @@ msg(){
 	}
 msg_debug(){
 	if [ "$DEBUG" = 1 ] ;then
-		warn $1
+		#warn $1
+		echo $1
 		fi 
 		}
 warn(){
@@ -97,7 +98,6 @@ warn(){
 err(){
 	printf "$RED$1$NC \n"
 	}
-
 
 ping_test_connection(){
 	ping -c 1 $1
@@ -205,11 +205,10 @@ sendSubvol_retry () {
 			fi
 		return 1
 		fi
-
 }
 
 
-function send_with () {
+send_with(){
 	case $1 in
 	ssh)
 		if [ "$sendpull" != "pull" ] ; then
@@ -253,13 +252,13 @@ function send_with () {
 		case $2 in
 		inc)
 			btrfs send -p $snapdir/$snapp  $snapdir/$snapf |pv| btrfs receive $snapsendloc
-			ec=${PIPESTATUS[3]}
+			ec=${PIPESTATUS[2]}
 			return $ec
 			;;
 		comp)
 			msg "sending complete subvolume"
 			btrfs send $snapdir/$snapf |pv| btrfs receive $snapsendloc
-			ec=${PIPESTATUS[3]}
+			ec=${PIPESTATUS[2]}
 			return $ec
 			;;
 		*)
@@ -309,22 +308,29 @@ for x in $(grep -v "^#" $conf_f) ; do
 	ip=$(cut -d '@' -f 2 <<< "$sshuh" )
 	#subnd="$subn-r-$(date +'%y%m%d')"
 	subnd="$subn-r-$(date '+%Y%m%d-%H%M')"
+
+	if [ "$transp" == "local" ] ;then
+		sendpull="NULL"
+		ip="NULL"
+		sshuh="NULL"
+		sshuh="NULL"
+	fi
 	
 	if [ "$DEBUG" = 1 ] ; then 
 		msg_debug "------------------------------------"
-		msg_debug "conf_f		$conf_f"
-		msg_debug "subn		$subn"
-		msg_debug "snapfs		$snapfs"
-		msg_debug "snapdir		$snapdir"
-		msg_debug "snapsendloc	$snapsendloc"
-		msg_debug "sshuh		$sshuh"
-		msg_debug "sshid		$sshid"
+		msg_debug "conf_f			$conf_f"
+		msg_debug "subn			$subn"
+		msg_debug "snapfs			$snapfs"
+		msg_debug "snapdir			$snapdir"
+		msg_debug "snapsendloc		$snapsendloc"
+		msg_debug "sshuh			$sshuh"
+		msg_debug "sshid			$sshid"
 		msg_debug "sub_keep		$sub_keep"
-		msg_debug "transp		$transp"
+		msg_debug "transp			$transp"
 		msg_debug "'ip(from sshuh)'	$ip"
-		msg_debug "subnd		$subnd"
+		msg_debug "subnd			$subnd"
 		msg_debug "sendpull		$sendpull"
-		msg_debug "sub_keep_remote	$sub_keep_remote"
+		msg_debug "sub_keep_remote		$sub_keep_remote"
 		msg_debug ""
 		msg_debug "------------------------------------"
 	fi
@@ -346,14 +352,14 @@ for x in $(grep -v "^#" $conf_f) ; do
 			msg "creating snapshot $snapdir/$subnd on $sshuh"
 			ssh -i $sshid $sshuh $DOAS btrfs sub snap -r $snapfs $snapdir/$subnd
 		fi
-		snapp=$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n 2p)
-		snapf=$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n 1p)
+		snapp="$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n 2p)"
+		snapf="$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n 1p)"
 		msg_debug "snapp $snapp"
 		msg_debug "snapf $snapf"
 		
 		sendSubvol_retry $transp inc $sendpull
 		ec=$?
-		msg_debug "sned exit code $ec"
+		msg_debug "send exit code $ec"
 		if [ "$ec" = 1 ] ; then
 			
 			msg_debug "error while sending subvolume"
