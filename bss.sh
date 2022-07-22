@@ -47,7 +47,7 @@ YELLOW='\033[1;33m'
 DOAS="doas"
 
 #quick hack
-if [ "$TERM" != "rxvt-unicode" ] || [ "$TERM" != "screen" ]  ; then
+if [ "$TERM" != "rxvt-unicode" ] && [ "$TERM" != "screen" ]  ; then
 	unset NC
 	unset RED
 	unset GREEN
@@ -189,7 +189,7 @@ sendSubvol_retry () {
 	send_with $1 $2 $3
 	ec=$?
 	msg_debug "sned exit code $ec"
-	if (( $ec == 1 )) ; then
+	if [ $ec -ne 0 ] ; then
 		if remoteCheckExist $sshuh $snapsendloc/$subnd && ! remoteCheckReadonly $sshuh $snapsendloc/$subnd ; then
 			msg "failed send, created snapshot is not readonly."
 				for x in $(seq 1 $MAXRETRY); do
@@ -362,9 +362,9 @@ for x in $(grep -v "^#" $conf_f) ; do
 		msg_debug "send exit code $ec"
 		if [ "$ec" = 1 ] ; then
 			
-			msg_debug "error while sending subvolume"
+			err "error while sending subvolume with parent $snapp"
 			for x in $(seq 3 $sub_keep) ; do
-				snapp=$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n $x'p')
+				snapp=$(bss_ls_snapdir |grep "^$subn-r-" |sort -r |sed -n "${x}p")
 				if [[ "$snapp" == "" ]] ;then
 					err "subvolume missing"
 					ec=1
@@ -375,10 +375,10 @@ for x in $(grep -v "^#" $conf_f) ; do
 				msg_debug  "snapf	$snapf"
 				send_with $transp inc
 				ec=$?
-				echo "ec=$ec"
-				if [ $ec = 0 ] ;then break ;fi
+				echo "ec=\"$ec\""
+				[ $ec = 0 ] && break
 			done
-			if [ "$ec" == 1 ] ;then
+			if [ $ec -ne 0 ] ;then
 				err "all avalible parent subvolumes failed. Attempting to send complete snapshot"
 				send_with $transp comp 
 			fi
