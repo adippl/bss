@@ -109,7 +109,7 @@ bss_ls_snapdir(){
 	if [ "$sendpull" != "pull" ] ; then
 		ls $snapdir
 	else
-		ssh -i $sshid $sshuh ls $snapdir
+		ssh -i $sshid $sshuh $DOAS ls $snapdir
 	fi
 }
 
@@ -133,7 +133,7 @@ remoteCheckReadonly(){
 	}
 remoteCheckExist(){
 	if [ "$sendpull" != "pull" ] && [ "$transp" = "ssh" ] ; then
-		ssh -i $sshid $sshuh "test -d $snapsendloc/$subnd"
+		ssh -i $sshid $sshuh "$DOAS test -d $snapsendloc/$subnd"
 		return $?
 	else
 		test -d $snapsendloc/$subnd
@@ -168,13 +168,13 @@ delsubvol(){
 }
 
 doesexist(){
-	ssh -i $sshid $sshuh "btrfs sub show $snapsendloc/$subn}"
+	ssh -i $sshid $sshuh "$DOAS btrfs sub show $snapsendloc/$subn}"
 	ec=$?
 	if test -s $ec
 	then
 		msg "snapshot exists"
 		if [[ -e $(detemp | grep readonly) ]] ; then
-			msg snapshot read only, probably fine
+			msg "snapshot read only, probably fine"
 			return 0
 		else
 			err snapshot incomplete
@@ -389,7 +389,7 @@ for x in $(grep -v "^#" $conf_f) ; do
 	
 	if [ "$sendpull" = "pull" ] ; then
 		msg "deleting older subvolumes on client"
-		for x in $(ssh -i $sshid $sshuh ls -1 $snapdir |grep "^$subn-r-" |sort -r |sed -n $sub_keep',$p'); do
+		for x in $(ssh -i $sshid $sshuh $DOAS ls -1 $snapdir |grep "^$subn-r-" |sort -r |sed -n $sub_keep',$p'); do
 			ssh -i $sshid $sshuh $DOAS btrfs sub del $snapdir/$x
 		done
 		msg "deleting older local subvolumes"
