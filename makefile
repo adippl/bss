@@ -17,9 +17,9 @@ install:
 	install -d -m 0750 $(DESTDIR)/etc/cron.daily
 	install -d -m 0750 $(DESTDIR)/etc/cron.weekly
 	install -d -m 0750 $(DESTDIR)/etc/cron.monthly
-	ln -s $(DESTDIR)$(PREFIX)/bin/btrfs_toolbox.sh $(DESTDIR)/etc/cron.daily/btrfs_device_stats.sh
-	ln -s $(DESTDIR)$(PREFIX)/bin/btrfs_toolbox.sh $(DESTDIR)/etc/cron.weekly/btrfs_trim.sh
-	ln -s $(DESTDIR)$(PREFIX)/bin/btrfs_toolbox.sh $(DESTDIR)/etc/cron.monthly/btrfs_scrub.sh
+	ln -s $(PREFIX)/bin/btrfs_toolbox.sh $(DESTDIR)/etc/cron.daily/btrfs_device_stats.sh
+	ln -s $(PREFIX)/bin/btrfs_toolbox.sh $(DESTDIR)/etc/cron.weekly/btrfs_trim.sh
+	ln -s $(PREFIX)/bin/btrfs_toolbox.sh $(DESTDIR)/etc/cron.monthly/btrfs_scrub.sh
 	
 uninstall:
 	rm $(DESTDIR)$(PREFIX)/bin/bss.sh
